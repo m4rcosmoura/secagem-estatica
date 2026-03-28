@@ -207,6 +207,16 @@
       letter-spacing: 0.5px;
     }
 
+    .silo-dr {
+      margin-top: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      color: #2563eb;
+      letter-spacing: 0.3px;
+    }
+    .silo-dr.dr-none { color: var(--muted); font-weight: 500; }
+
     /* ── Modals ── */
     .modal-backdrop {
       position: fixed;
@@ -589,6 +599,27 @@
       return Number(value).toFixed(1).replace(".", ",");
     }
 
+    // Drying Rate: (média umidade anterior - média umidade atual) / horas entre leituras
+    // Só válido se o intervalo entre as duas últimas leituras for < 50 minutos
+    function computeDR(silo) {
+      const h = silo.history;
+      if (h.length < 2) return null;
+      const prev = h[h.length - 2];
+      const curr = h[h.length - 1];
+      const dtMin = (new Date(curr.timestamp) - new Date(prev.timestamp)) / 60000; // minutos
+      if (dtMin <= 0 || dtMin >= 50) return null;
+      const avgPrev = (Number(prev.umidadeAlta) + Number(prev.umidadeMeio) + Number(prev.umidadeBaixa)) / 3;
+      const avgCurr = (Number(curr.umidadeAlta) + Number(curr.umidadeMeio) + Number(curr.umidadeBaixa)) / 3;
+      const dtHoras = dtMin / 60;
+      return (avgPrev - avgCurr) / dtHoras;
+    }
+
+    function formatDR(silo) {
+      const dr = computeDR(silo);
+      if (dr === null) return null;
+      return "DR: " + dr.toFixed(2).replace(".", ",") + " pph";
+    }
+
     // ── Selects ──────────────────────────────────────────────────────────────
     function populateDryerSelect() {
       dryerSelect.innerHTML = Object.keys(dryers)
@@ -649,9 +680,15 @@
         cat.className = "silo-category";
         cat.textContent = silo.categoria || "-";
 
+        const drLabel = document.createElement("div");
+        const drText = formatDR(silo);
+        drLabel.className = "silo-dr" + (drText ? "" : " dr-none");
+        drLabel.textContent = drText || "DR: —";
+
         visual.appendChild(unit);
         visual.appendChild(name);
         visual.appendChild(cat);
+        visual.appendChild(drLabel);
         card.appendChild(visual);
         grid.appendChild(card);
       });
@@ -840,6 +877,14 @@
     }
 
     function drawLegend() {
+      if (chartMode === "dryingrate") {
+        ctx.fillStyle = "#7c3aed";
+        ctx.fillRect(20, 10, 10, 10);
+        ctx.fillStyle = "#333";
+        ctx.font = "11px Arial";
+        ctx.fillText("Drying Rate (pph)", 34, 19);
+        return;
+      }
       [{ label:"Baixa", color:"#ef4444" }, { label:"Meio", color:"#3b82f6" }, { label:"Alta", color:"#22c55e" }]
         .forEach((item, i) => {
           const x = 20 + i * 80;
@@ -858,29 +903,67 @@
 
       const history = silo.history.length ? silo.history : [{
         timestamp: new Date().toISOString(),
-        umidadeBaixa: silo.umidadeBaixa, umidadeMeio: silo.umidadeMeio, umidadeAlta: silo.umidadeAlta
+        umidadeBaixa: silo.umidadeBaixa, umidadeMeio: silo.umidadeMeio, umidadeAlta: silo.umidadeAlta,
+        tempBaixa: silo.tempBaixa, tempMeio: silo.tempMeio, tempAlta: silo.tempAlta
       }];
-
-      const labels = history.map(h => h.timestamp);
-      const baixa  = history.map(h => Number(chartMode === "umidade" ? h.umidadeBaixa : h.tempBaixa));
-      const meio   = history.map(h => Number(chartMode === "umidade" ? h.umidadeMeio  : h.tempMeio));
-      const alta   = history.map(h => Number(chartMode === "umidade" ? h.umidadeAlta  : h.tempAlta));
-      const all    = [...baixa, ...meio, ...alta];
-      const minY   = Math.min(...all) - 0.5;
-      const maxY   = Math.max(...all) + 0.5;
 
       ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
       drawLegend();
 
       const plotX = 38, plotY = 34, plotW = chartCanvas.width - 52, plotH = 155;
-      drawAxes(plotX, plotY, plotW, plotH, labels, minY, maxY);
-      drawLine(baixa, labels, plotX, plotY, plotW, plotH, minY, maxY, "#ef4444");
-      drawLine(meio,  labels, plotX, plotY, plotW, plotH, minY, maxY, "#3b82f6");
-      drawLine(alta,  labels, plotX, plotY, plotW, plotH, minY, maxY, "#22c55e");
 
-      chartTitle.textContent    = `${currentDryer} — ${silo.nome}`;
-      chartSubtitle.textContent = `Categoria: ${silo.categoria || "-"} · ${chartMode === "umidade" ? "Umidade (%)" : "Temperatura (°C)"}`;
-      historyCount.textContent  = `${history.length} registro${history.length !== 1 ? "s" : ""} no histórico`;
+      if (chartMode === "dryingrate") {
+        // Calcula DR ponto a ponto entre leituras consecutivas válidas (intervalo < 50min)
+        const drPoints = [];
+        for (let i = 1; i < history.length; i++) {
+          const prev = history[i - 1];
+          const curr = history[i];
+          const dtMin = (new Date(curr.timestamp) - new Date(prev.timestamp)) / 60000;
+          if (dtMin > 0 && dtMin < 50) {
+            const avgPrev = (Number(prev.umidadeAlta) + Number(prev.umidadeMeio) + Number(prev.umidadeBaixa)) / 3;
+            const avgCurr = (Number(curr.umidadeAlta) + Number(curr.umidadeMeio) + Number(curr.umidadeBaixa)) / 3;
+            drPoints.push({ timestamp: curr.timestamp, dr: (avgPrev - avgCurr) / (dtMin / 60) });
+          }
+        }
+
+        if (drPoints.length === 0) {
+          ctx.fillStyle = "#888";
+          ctx.font = "13px Poppins, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("Sem dados suficientes para Drying Rate", chartCanvas.width / 2, chartCanvas.height / 2);
+          ctx.textAlign = "left";
+        } else {
+          const drValues = drPoints.map(p => p.dr);
+          const drLabels = drPoints.map(p => p.timestamp);
+          const minY = Math.min(...drValues) - 0.1;
+          const maxY = Math.max(...drValues) + 0.1;
+          drawAxes(plotX, plotY, plotW, plotH, drLabels, minY, maxY);
+          drawLine(drValues, drLabels, plotX, plotY, plotW, plotH, minY, maxY, "#7c3aed");
+        }
+
+        chartTitle.textContent    = `${currentDryer} — ${silo.nome}`;
+        chartSubtitle.textContent = `Categoria: ${silo.categoria || "-"} · Drying Rate (pph)`;
+        historyCount.textContent  = `${history.length} registro${history.length !== 1 ? "s" : ""} no histórico`;
+
+      } else {
+        const labels = history.map(h => h.timestamp);
+        const baixa  = history.map(h => Number(chartMode === "umidade" ? h.umidadeBaixa : h.tempBaixa));
+        const meio   = history.map(h => Number(chartMode === "umidade" ? h.umidadeMeio  : h.tempMeio));
+        const alta   = history.map(h => Number(chartMode === "umidade" ? h.umidadeAlta  : h.tempAlta));
+        const all    = [...baixa, ...meio, ...alta];
+        const minY   = Math.min(...all) - 0.5;
+        const maxY   = Math.max(...all) + 0.5;
+
+        drawAxes(plotX, plotY, plotW, plotH, labels, minY, maxY);
+        drawLine(baixa, labels, plotX, plotY, plotW, plotH, minY, maxY, "#ef4444");
+        drawLine(meio,  labels, plotX, plotY, plotW, plotH, minY, maxY, "#3b82f6");
+        drawLine(alta,  labels, plotX, plotY, plotW, plotH, minY, maxY, "#22c55e");
+
+        chartTitle.textContent    = `${currentDryer} — ${silo.nome}`;
+        chartSubtitle.textContent = `Categoria: ${silo.categoria || "-"} · ${chartMode === "umidade" ? "Umidade (%)" : "Temperatura (°C)"}`;
+        historyCount.textContent  = `${history.length} registro${history.length !== 1 ? "s" : ""} no histórico`;
+      }
+
       chartBackdrop.classList.add("show");
     }
 
@@ -898,9 +981,19 @@
     modalBackdrop.addEventListener("click", e => { if (e.target === modalBackdrop) closeModal(); });
     chartBackdrop.addEventListener("click",  e => { if (e.target === chartBackdrop) closeChart(); });
 
-    document.getElementById("toggleChartBtn").addEventListener("click", () => {
-      chartMode = chartMode === "umidade" ? "temperatura" : "umidade";
-      document.getElementById("toggleChartBtn").textContent = chartMode === "umidade" ? "Ver Temperatura" : "Ver Umidade";
+    const toggleChartBtn = document.getElementById("toggleChartBtn");
+
+    function updateToggleLabel() {
+      if (chartMode === "umidade")      toggleChartBtn.textContent = "Ver Temperatura";
+      else if (chartMode === "temperatura") toggleChartBtn.textContent = "Ver Drying Rate";
+      else                              toggleChartBtn.textContent = "Ver Umidade";
+    }
+
+    toggleChartBtn.addEventListener("click", () => {
+      if (chartMode === "umidade")           chartMode = "temperatura";
+      else if (chartMode === "temperatura")  chartMode = "dryingrate";
+      else                                   chartMode = "umidade";
+      updateToggleLabel();
       closeChart();
       setTimeout(() => openChart(lastOpenedSiloId), 50);
     });
