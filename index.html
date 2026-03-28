@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Secadores</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root{
+      --bg: #e9e9e9;
+      --line: #111;
+      --fill: #f2bf00;
+      --text: #000;
+      --panel: #ffffff;
+      --btn: #1e1e1e;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+    }
+
+    .screen {
+      width: 100%;
+      max-width: 420px;
+      min-height: 100vh;
+      background: var(--bg);
+      padding: 10px 12px 20px;
+    }
+
+    .topbar {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin: 10px 0 14px;
+    }
+
+    .dryer-select {
+      appearance: none;
+      -webkit-appearance: none;
+      border: 0;
+      background: transparent;
+      color: #000;
+      font-size: 28px;
+      font-weight: 800;
+      text-align: center;
+      cursor: pointer;
+      padding: 4px 26px 4px 6px;
+      background-image:
+        linear-gradient(45deg, transparent 50%, #000 50%),
+        linear-gradient(135deg, #000 50%, transparent 50%);
+      background-position:
+        calc(100% - 16px) calc(50% - 3px),
+        calc(100% - 10px) calc(50% - 3px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: center;
+    }
+
+    .action-btn {
+      border: 0;
+      background: var(--btn);
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      min-height: 42px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+    }
+
+    .sync-status {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: #e0e0e0;
+      color: #555;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .sync-status.syncing  { background: #fff3cd; color: #856404; }
+    .sync-status.ok       { background: #d4edda; color: #155724; }
+    .sync-status.error    { background: #f8d7da; color: #721c24; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      column-gap: 22px;
+      row-gap: 20px;
+      justify-items: center;
+    }
+
+    .silo-card {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .silo-visual {
+      width: 116px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .unit {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .tank {
+      width: 64px;
+      height: 134px;
+      border: 1px solid var(--line);
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .segment {
+      width: 100%;
+      border-bottom: 1px solid var(--line);
+      background: var(--fill);
+      flex: 1;
+    }
+
+    .segment:last-child {
+      border-bottom: 0;
+    }
+
+    .segment.empty {
+      background: #fff;
+    }
+
+    .values {
+      width: 48px;
+      height: 134px;
+      position: relative;
+      font-family: "Times New Roman", Times, serif;
+      font-size: 14px;
+      color: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .v {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .v1 { top: 18px; }
+    .v2 { top: 58px; }
+    .v3 { top: 98px; }
+
+    .silo-name {
+      margin-top: 6px;
+      width: 100%;
+      font-size: 14px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .silo-category {
+      margin-top: 2px;
+      width: 100%;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 999;
+      overflow-y: auto;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .modal {
+      width: 100%;
+      max-width: 350px;
+      background: var(--panel);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+    }
+
+    .modal h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+      text-align: center;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 1px solid #bbb;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .modal-actions button {
+      flex: 1;
+      min-height: 42px;
+      border: 0;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-cancel {
+      background: #d9d9d9;
+      color: #111;
+    }
+
+    .btn-save {
+      background: #111;
+      color: #fff;
+    }
+
+    .btn-save:disabled {
+      background: #888;
+      cursor: not-allowed;
+    }
+
+    .chart-subtitle {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .chart-wrap {
+      width: 100%;
+      overflow-x: auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 8px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 240px;
+      display: block;
+    }
+
+    .history-note {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #333;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="screen">
+    <div class="topbar">
+      <select id="dryerSelect" class="dryer-select" aria-label="Selecionar secador"></select>
+      <div class="toolbar">
+        <button class="action-btn" id="openModalBtn">Adicionar ação</button>
+      </div>
+      <span class="sync-status" id="syncStatus">Aguardando…</span>
+    </div>
+
+    <section class="grid" id="siloGrid"></section>
+  </main>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <h2>Nova ação</h2>
+
+      <div class="field">
+        <label for="siloSelect">Silo</label>
+        <select id="siloSelect"></select>
+      </div>
+
+      <div class="field">
+        <label for="nivelInput">Nível do silo (%)</label>
+        <input id="nivelInput" type="number" min="0" max="100" step="0.1" placeholder="Ex: 85" />
+      </div>
+
+      <div class="field">
+        <label for="umidadeBaixaInput">Umidade da parte baixa (%)</label>
+        <input id="umidadeBaixaInput" type="number" min="0" max="100" step="0.1" placeholder="Ex: 15,0" />
+      </div>
+
+      <div class="field">
+        <label for="tempBaixaInput">Temperatura da parte baixa (°C)</label>
+        <input id="tempBaixaInput" type="number" step="0.1" placeholder="Ex: 28,5" />
+      </div>
+
+      <div class="field">
+        <label for="umidadeMeioInput">Umidade da parte do meio (%)</label>
+        <input id="umidadeMeioInput" type="number" min="0" max="100" step="0.1" placeholder="Ex: 14,2" />
+      </div>
+
+      <div class="field">
+        <label for="tempMeioInput">Temperatura da parte do meio (°C)</label>
+        <input id="tempMeioInput" type="number" step="0.1" placeholder="Ex: 27,0" />
+      </div>
+
+      <div class="field">
+        <label for="umidadeAltaInput">Umidade da parte alta (%)</label>
+        <input id="umidadeAltaInput" type="number" min="0" max="100" step="0.1" placeholder="Ex: 13,6" />
+      </div>
+
+      <div class="field">
+        <label for="tempAltaInput">Temperatura da parte alta (°C)</label>
+        <input id="tempAltaInput" type="number" step="0.1" placeholder="Ex: 25,5" />
+      </div>
+
+      <div class="field">
+        <label for="categoriaInput">Categoria</label>
+        <select id="categoriaInput">
+          <option value="Genética">Genética</option>
+          <option value="Básica">Básica</option>
+          <option value="C1">C1</option>
+          <option value="C2">C2</option>
+          <option value="S1">S1</option>
+          <option value="S2">S2</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" id="cancelBtn" type="button">Cancelar</button>
+        <button class="btn-save" id="saveBtn" type="button">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="chartBackdrop">
+    <div class="modal">
+      <h2 id="chartTitle">Histórico do silo</h2>
+      <div class="chart-subtitle" id="chartSubtitle"></div>
+      <div class="chart-wrap">
+        <canvas id="historyChart" width="320" height="240"></canvas>
+      </div>
+      <div class="history-note" id="historyCount"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="toggleChartBtn" type="button">Ver Temperatura</button>
+        <button class="btn-cancel" id="closeChartBtn" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Supabase config ───────────────────────────────────────────────────────
+    const SUPABASE_URL  = "https://aizsokjiqqmdnvlrgusx.supabase.co";
+    const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpenNva2ppcXFtZG52bHJndXN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MDE0MDIsImV4cCI6MjA5MDI3NzQwMn0.xZjitYi1DK4IoRgdzxX7NKqJ7eFpRILB5_lxAFaitOY";
+    const TABLE         = "silo_readings";
+
+    const HEADERS = {
+      "Content-Type":  "application/json",
+      "apikey":        SUPABASE_KEY,
+      "Authorization": `Bearer ${SUPABASE_KEY}`,
+      "Prefer":        "return=minimal"
+    };
+
+    async function saveToSupabase(record) {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+        method:  "POST",
+        headers: HEADERS,
+        body:    JSON.stringify(record)
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const dryers = {
+      "SECADOR 09": {
+        silos: [
+          { id: 1, nome: "Silo 01", nivel: 85, umidadeBaixa: 15.0, tempBaixa: 28.0, umidadeMeio: 14.2, tempMeio: 27.1, umidadeAlta: 13.6, tempAlta: 25.8, categoria: "Genética", history: [] },
+          { id: 2, nome: "Silo 02", nivel: 85, umidadeBaixa: 14.0, tempBaixa: 27.8, umidadeMeio: 13.7, tempMeio: 26.8, umidadeAlta: 12.5, tempAlta: 25.1, categoria: "Básica",   history: [] },
+          { id: 3, nome: "Silo 03", nivel: 85, umidadeBaixa: 15.0, tempBaixa: 28.3, umidadeMeio: 14.2, tempMeio: 27.2, umidadeAlta: 13.6, tempAlta: 25.7, categoria: "C1",       history: [] },
+          { id: 4, nome: "Silo 04", nivel: 85, umidadeBaixa: 14.0, tempBaixa: 27.5, umidadeMeio: 13.7, tempMeio: 26.7, umidadeAlta: 12.5, tempAlta: 25.0, categoria: "C2",       history: [] },
+          { id: 5, nome: "Silo 05", nivel: 85, umidadeBaixa: 15.0, tempBaixa: 28.1, umidadeMeio: 14.2, tempMeio: 27.0, umidadeAlta: 13.6, tempAlta: 25.6, categoria: "S1",       history: [] },
+          { id: 6, nome: "Silo 06", nivel: 85, umidadeBaixa: 14.0, tempBaixa: 27.6, umidadeMeio: 13.7, tempMeio: 26.9, umidadeAlta: 12.5, tempAlta: 25.2, categoria: "S2",       history: [] }
+        ]
+      },
+      "SECADOR 10": {
+        silos: [
+          { id: 1, nome: "Silo 01", nivel: 82, umidadeBaixa: 15.3, tempBaixa: 28.8, umidadeMeio: 14.5, tempMeio: 27.5, umidadeAlta: 13.8, tempAlta: 26.0, categoria: "Genética", history: [] },
+          { id: 2, nome: "Silo 02", nivel: 79, umidadeBaixa: 14.4, tempBaixa: 28.2, umidadeMeio: 13.9, tempMeio: 27.0, umidadeAlta: 12.9, tempAlta: 25.5, categoria: "Básica",   history: [] },
+          { id: 3, nome: "Silo 03", nivel: 77, umidadeBaixa: 15.1, tempBaixa: 28.4, umidadeMeio: 14.1, tempMeio: 27.1, umidadeAlta: 13.4, tempAlta: 25.7, categoria: "C1",       history: [] },
+          { id: 4, nome: "Silo 04", nivel: 80, umidadeBaixa: 14.2, tempBaixa: 27.9, umidadeMeio: 13.8, tempMeio: 26.8, umidadeAlta: 12.7, tempAlta: 25.3, categoria: "C2",       history: [] },
+          { id: 5, nome: "Silo 05", nivel: 84, umidadeBaixa: 15.4, tempBaixa: 28.7, umidadeMeio: 14.4, tempMeio: 27.4, umidadeAlta: 13.7, tempAlta: 25.9, categoria: "S1",       history: [] },
+          { id: 6, nome: "Silo 06", nivel: 81, umidadeBaixa: 14.3, tempBaixa: 28.0, umidadeMeio: 13.9, tempMeio: 26.9, umidadeAlta: 12.8, tempAlta: 25.4, categoria: "S2",       history: [] }
+        ]
+      },
+      "SECADOR 11": {
+        silos: [
+          { id: 1, nome: "Silo 01", nivel: 76, umidadeBaixa: 15.8, tempBaixa: 29.1, umidadeMeio: 14.8, tempMeio: 27.8, umidadeAlta: 14.0, tempAlta: 26.2, categoria: "Genética", history: [] },
+          { id: 2, nome: "Silo 02", nivel: 73, umidadeBaixa: 14.8, tempBaixa: 28.6, umidadeMeio: 14.1, tempMeio: 27.3, umidadeAlta: 13.2, tempAlta: 25.8, categoria: "Básica",   history: [] },
+          { id: 3, nome: "Silo 03", nivel: 78, umidadeBaixa: 15.5, tempBaixa: 29.0, umidadeMeio: 14.6, tempMeio: 27.6, umidadeAlta: 13.9, tempAlta: 26.1, categoria: "C1",       history: [] },
+          { id: 4, nome: "Silo 04", nivel: 74, umidadeBaixa: 14.9, tempBaixa: 28.5, umidadeMeio: 14.0, tempMeio: 27.2, umidadeAlta: 13.1, tempAlta: 25.7, categoria: "C2",       history: [] }
+        ]
+      }
+    };
+
+    let currentDryer = "SECADOR 09";
+
+    const dryerSelect       = document.getElementById("dryerSelect");
+    const grid              = document.getElementById("siloGrid");
+    const modalBackdrop     = document.getElementById("modalBackdrop");
+    const openModalBtn      = document.getElementById("openModalBtn");
+    const cancelBtn         = document.getElementById("cancelBtn");
+    const saveBtn           = document.getElementById("saveBtn");
+    const siloSelect        = document.getElementById("siloSelect");
+    const nivelInput        = document.getElementById("nivelInput");
+    const umidadeBaixaInput = document.getElementById("umidadeBaixaInput");
+    const tempBaixaInput    = document.getElementById("tempBaixaInput");
+    const umidadeMeioInput  = document.getElementById("umidadeMeioInput");
+    const tempMeioInput     = document.getElementById("tempMeioInput");
+    const umidadeAltaInput  = document.getElementById("umidadeAltaInput");
+    const tempAltaInput     = document.getElementById("tempAltaInput");
+    const categoriaInput    = document.getElementById("categoriaInput");
+    const syncStatus        = document.getElementById("syncStatus");
+
+    const chartBackdrop = document.getElementById("chartBackdrop");
+    const chartTitle    = document.getElementById("chartTitle");
+    const chartSubtitle = document.getElementById("chartSubtitle");
+    const historyCount  = document.getElementById("historyCount");
+    const closeChartBtn = document.getElementById("closeChartBtn");
+    const chartCanvas   = document.getElementById("historyChart");
+    const ctx           = chartCanvas.getContext("2d");
+    let chartMode = "umidade";
+
+    function setSyncStatus(state, text) {
+      syncStatus.className = "sync-status " + state;
+      syncStatus.textContent = text;
+    }
+
+    function nowLabel() {
+      return new Date().toISOString();
+    }
+
+    function getCurrentSilos() {
+      return dryers[currentDryer].silos;
+    }
+
+    function formatPercent(value) {
+      return Number(value).toFixed(1).replace(".", ",") + "%";
+    }
+
+    function formatNumber(value) {
+      return Number(value).toFixed(1).replace(".", ",");
+    }
+
+    function seedHistory() {
+      Object.values(dryers).forEach(dryer => {
+        dryer.silos.forEach(silo => {
+          if (silo.history.length === 0) {
+            const base = [
+              { hoursAgo: 2, deltaB: 0.6, deltaM: 0.4, deltaA: 0.3 },
+              { hoursAgo: 1, deltaB: 0.3, deltaM: 0.2, deltaA: 0.1 },
+              { hoursAgo: 0, deltaB: 0.0, deltaM: 0.0, deltaA: 0.0 }
+            ];
+            base.forEach((item) => {
+              const d = new Date();
+              d.setHours(d.getHours() - item.hoursAgo);
+              silo.history.push({
+                timestamp:    d.toISOString(),
+                nivel:        silo.nivel,
+                umidadeBaixa: Number((silo.umidadeBaixa + item.deltaB).toFixed(1)),
+                tempBaixa:    silo.tempBaixa,
+                umidadeMeio:  Number((silo.umidadeMeio  + item.deltaM).toFixed(1)),
+                tempMeio:     silo.tempMeio,
+                umidadeAlta:  Number((silo.umidadeAlta  + item.deltaA).toFixed(1)),
+                tempAlta:     silo.tempAlta,
+                categoria:    silo.categoria
+              });
+            });
+          }
+        });
+      });
+    }
+
+    function populateDryerSelect() {
+      dryerSelect.innerHTML = Object.keys(dryers)
+        .map(name => `<option value="${name}">${name}</option>`)
+        .join("");
+      dryerSelect.value = currentDryer;
+    }
+
+    function populateSiloSelect() {
+      siloSelect.innerHTML = getCurrentSilos()
+        .map(silo => `<option value="${silo.id}">${silo.nome}</option>`)
+        .join("");
+    }
+
+    function renderSilos() {
+      grid.innerHTML = "";
+
+      getCurrentSilos().forEach((silo) => {
+        const card = document.createElement("div");
+        card.className = "silo-card";
+
+        const visual = document.createElement("div");
+        visual.className = "silo-visual";
+
+        const unit = document.createElement("div");
+        unit.className = "unit";
+        unit.dataset.siloId = silo.id;
+        unit.title = "Toque para abrir o gráfico";
+
+        const tank = document.createElement("div");
+        tank.className = "tank";
+
+        const filledSegments = Math.max(0, Math.min(6, Math.round((Number(silo.nivel) / 100) * 6)));
+        const emptySegments  = 6 - filledSegments;
+
+        for (let i = 0; i < emptySegments; i++) {
+          const segment = document.createElement("div");
+          segment.className = "segment empty";
+          tank.appendChild(segment);
+        }
+        for (let i = 0; i < filledSegments; i++) {
+          const segment = document.createElement("div");
+          segment.className = "segment";
+          tank.appendChild(segment);
+        }
+
+        const values = document.createElement("div");
+        values.className = "values";
+        values.innerHTML = `
+          <div class="v v1">${formatPercent(silo.umidadeAlta)}</div>
+          <div class="v v2">${formatPercent(silo.umidadeMeio)}</div>
+          <div class="v v3">${formatPercent(silo.umidadeBaixa)}</div>
+        `;
+
+        unit.appendChild(tank);
+        unit.appendChild(values);
+
+        const name = document.createElement("div");
+        name.className = "silo-name";
+        name.textContent = silo.nome;
+
+        const category = document.createElement("div");
+        category.className = "silo-category";
+        category.textContent = silo.categoria || "-";
+
+        visual.appendChild(unit);
+        visual.appendChild(name);
+        visual.appendChild(category);
+
+        card.appendChild(visual);
+        grid.appendChild(card);
+      });
+
+      document.querySelectorAll(".unit").forEach(el => {
+        el.addEventListener("click", () => openChart(Number(el.dataset.siloId)));
+      });
+    }
+
+    function openModal() {
+      populateSiloSelect();
+      siloSelect.value = getCurrentSilos()[0]?.id || "";
+      loadSelectedSilo();
+      modalBackdrop.classList.add("show");
+    }
+
+    function closeModal() {
+      modalBackdrop.classList.remove("show");
+    }
+
+    function getSelectedSilo() {
+      return getCurrentSilos().find((item) => item.id === Number(siloSelect.value));
+    }
+
+    function loadSelectedSilo() {
+      const silo = getSelectedSilo();
+      if (!silo) return;
+      nivelInput.value        = silo.nivel;
+      umidadeBaixaInput.value = silo.umidadeBaixa;
+      tempBaixaInput.value    = silo.tempBaixa;
+      umidadeMeioInput.value  = silo.umidadeMeio;
+      tempMeioInput.value     = silo.tempMeio;
+      umidadeAltaInput.value  = silo.umidadeAlta;
+      tempAltaInput.value     = silo.tempAlta;
+      categoriaInput.value    = silo.categoria || "";
+    }
+
+    async function saveAction() {
+      const silo = getSelectedSilo();
+      if (!silo) return;
+
+      const payload = {
+        nivel:        parseFloat(nivelInput.value),
+        umidadeBaixa: parseFloat(umidadeBaixaInput.value),
+        tempBaixa:    parseFloat(tempBaixaInput.value),
+        umidadeMeio:  parseFloat(umidadeMeioInput.value),
+        tempMeio:     parseFloat(tempMeioInput.value),
+        umidadeAlta:  parseFloat(umidadeAltaInput.value),
+        tempAlta:     parseFloat(tempAltaInput.value),
+        categoria:    categoriaInput.value.trim()
+      };
+
+      const required = [
+        payload.nivel, payload.umidadeBaixa, payload.tempBaixa,
+        payload.umidadeMeio, payload.tempMeio,
+        payload.umidadeAlta, payload.tempAlta
+      ];
+
+      if (required.some(v => Number.isNaN(v)) || !payload.categoria) {
+        alert("Preencha todos os campos.");
+        return;
+      }
+
+      // Atualiza estado local
+      silo.nivel        = Math.max(0, Math.min(100, payload.nivel));
+      silo.umidadeBaixa = payload.umidadeBaixa;
+      silo.tempBaixa    = payload.tempBaixa;
+      silo.umidadeMeio  = payload.umidadeMeio;
+      silo.tempMeio     = payload.tempMeio;
+      silo.umidadeAlta  = payload.umidadeAlta;
+      silo.tempAlta     = payload.tempAlta;
+      silo.categoria    = payload.categoria;
+
+      const timestamp = nowLabel();
+
+      silo.history.push({
+        timestamp,
+        nivel:        silo.nivel,
+        umidadeBaixa: silo.umidadeBaixa,
+        tempBaixa:    silo.tempBaixa,
+        umidadeMeio:  silo.umidadeMeio,
+        tempMeio:     silo.tempMeio,
+        umidadeAlta:  silo.umidadeAlta,
+        tempAlta:     silo.tempAlta,
+        categoria:    silo.categoria
+      });
+
+      renderSilos();
+      closeModal();
+
+      // Envia ao Supabase
+      setSyncStatus("syncing", "Salvando…");
+      saveBtn.disabled = true;
+
+      const record = {
+        timestamp,
+        secador:      currentDryer,
+        silo_id:      silo.id,
+        silo_nome:    silo.nome,
+        nivel:        silo.nivel,
+        umidade_baixa: silo.umidadeBaixa,
+        temp_baixa:    silo.tempBaixa,
+        umidade_meio:  silo.umidadeMeio,
+        temp_meio:     silo.tempMeio,
+        umidade_alta:  silo.umidadeAlta,
+        temp_alta:     silo.tempAlta,
+        categoria:     silo.categoria
+      };
+
+      try {
+        await saveToSupabase(record);
+        setSyncStatus("ok", "✓ Salvo no Supabase");
+        setTimeout(() => setSyncStatus("", ""), 4000);
+      } catch (err) {
+        console.error("Supabase error:", err);
+        setSyncStatus("error", "⚠ Erro ao salvar");
+      } finally {
+        saveBtn.disabled = false;
+      }
+    }
+
+    function drawAxes(plotX, plotY, plotW, plotH, labels, minY, maxY) {
+      ctx.strokeStyle = "#333";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(plotX, plotY);
+      ctx.lineTo(plotX, plotY + plotH);
+      ctx.lineTo(plotX + plotW, plotY + plotH);
+      ctx.stroke();
+
+      ctx.fillStyle = "#222";
+      ctx.font = "11px Arial";
+
+      for (let i = 0; i < 5; i++) {
+        const value = minY + ((maxY - minY) * (4 - i) / 4);
+        const y = plotY + (plotH * i / 4);
+        ctx.strokeStyle = "#e0e0e0";
+        ctx.beginPath();
+        ctx.moveTo(plotX, y);
+        ctx.lineTo(plotX + plotW, y);
+        ctx.stroke();
+        ctx.fillText(formatNumber(value), 4, y + 3);
+      }
+
+      labels.forEach((label, index) => {
+        const x = labels.length === 1 ? plotX + plotW / 2 : plotX + (plotW * index / (labels.length - 1));
+        ctx.fillStyle = "#222";
+
+        const d = new Date(label);
+        if (!Number.isNaN(d.getTime())) {
+          const pad  = (n) => String(n).padStart(2, "0");
+          const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          const date = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+          ctx.fillText(time, x - 18, plotY + plotH + 14);
+          ctx.fillText(date, x - 18, plotY + plotH + 28);
+        } else {
+          ctx.fillText(label, x - 18, plotY + plotH + 16);
+        }
+      });
+    }
+
+    function drawLine(values, labels, plotX, plotY, plotW, plotH, minY, maxY, color) {
+      if (!values.length) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      values.forEach((value, index) => {
+        const x = values.length === 1 ? plotX + plotW / 2 : plotX + (plotW * index / (values.length - 1));
+        const ratio = (value - minY) / (maxY - minY || 1);
+        const y = plotY + plotH - (ratio * plotH);
+        if (index === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      values.forEach((value, index) => {
+        const x = values.length === 1 ? plotX + plotW / 2 : plotX + (plotW * index / (values.length - 1));
+        const ratio = (value - minY) / (maxY - minY || 1);
+        const y = plotY + plotH - (ratio * plotH);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+
+    function drawLegend() {
+      const items = [
+        { label: "Baixa", color: "#d62728" },
+        { label: "Meio",  color: "#1f77b4" },
+        { label: "Alta",  color: "#2ca02c" }
+      ];
+      let x = 20;
+      const y = 18;
+      items.forEach(item => {
+        ctx.fillStyle = item.color;
+        ctx.fillRect(x, y - 8, 12, 12);
+        ctx.fillStyle = "#111";
+        ctx.font = "12px Arial";
+        ctx.fillText(item.label, x + 18, y + 2);
+        x += 76;
+      });
+    }
+
+    function openChart(siloId) {
+      lastOpenedSiloId = siloId;
+      const silo = getCurrentSilos().find(item => item.id === siloId);
+      if (!silo) return;
+
+      const history = silo.history.length ? silo.history : [{
+        timestamp:    new Date().toISOString(),
+        umidadeBaixa: silo.umidadeBaixa,
+        umidadeMeio:  silo.umidadeMeio,
+        umidadeAlta:  silo.umidadeAlta
+      }];
+
+      const labels = history.map((item) => item.timestamp);
+      const baixa  = history.map(item => Number(chartMode === "umidade" ? item.umidadeBaixa : item.tempBaixa));
+      const meio   = history.map(item => Number(chartMode === "umidade" ? item.umidadeMeio  : item.tempMeio));
+      const alta   = history.map(item => Number(chartMode === "umidade" ? item.umidadeAlta  : item.tempAlta));
+
+      const all  = [...baixa, ...meio, ...alta];
+      const minY = Math.min(...all) - 0.5;
+      const maxY = Math.max(...all) + 0.5;
+
+      ctx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+      drawLegend();
+
+      const plotX = 38;
+      const plotY = 34;
+      const plotW = chartCanvas.width - 52;
+      const plotH = 160;
+
+      drawAxes(plotX, plotY, plotW, plotH, labels, minY, maxY);
+      drawLine(baixa, labels, plotX, plotY, plotW, plotH, minY, maxY, "#d62728");
+      drawLine(meio,  labels, plotX, plotY, plotW, plotH, minY, maxY, "#1f77b4");
+      drawLine(alta,  labels, plotX, plotY, plotW, plotH, minY, maxY, "#2ca02c");
+
+      chartTitle.textContent    = `${currentDryer} - ${silo.nome}`;
+      chartSubtitle.textContent = `Categoria: ${silo.categoria || "-"} | Tipo: ${chartMode === "umidade" ? "Umidade (%)" : "Temperatura (°C)"}`;
+      historyCount.textContent  = `Total de registros em histórico: ${history.length}`;
+      chartBackdrop.classList.add("show");
+    }
+
+    function closeChart() {
+      chartBackdrop.classList.remove("show");
+    }
+
+    function changeDryer() {
+      currentDryer = dryerSelect.value;
+      renderSilos();
+    }
+
+    openModalBtn.addEventListener("click", openModal);
+    cancelBtn.addEventListener("click", closeModal);
+    saveBtn.addEventListener("click", saveAction);
+    siloSelect.addEventListener("change", loadSelectedSilo);
+    dryerSelect.addEventListener("change", changeDryer);
+    closeChartBtn.addEventListener("click", closeChart);
+
+    modalBackdrop.addEventListener("click", (event) => {
+      if (event.target === modalBackdrop) closeModal();
+    });
+
+    chartBackdrop.addEventListener("click", (event) => {
+      if (event.target === chartBackdrop) closeChart();
+    });
+
+    const toggleChartBtn = document.getElementById("toggleChartBtn");
+    toggleChartBtn.addEventListener("click", () => {
+      chartMode = chartMode === "umidade" ? "temperatura" : "umidade";
+      toggleChartBtn.textContent = chartMode === "umidade" ? "Ver Temperatura" : "Ver Umidade";
+      closeChart();
+      setTimeout(() => openChart(lastOpenedSiloId), 50);
+    });
+    let lastOpenedSiloId = null;
+
+    seedHistory();
+    populateDryerSelect();
+    renderSilos();
+  </script>
+</body>
+</html>
